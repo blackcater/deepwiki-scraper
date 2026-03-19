@@ -113,15 +113,71 @@ export async function scrapeNavTree(
 	owner: string,
 	name: string,
 	config: Config
-): Promise<NavNode[]> {
+): Promise<{ owner: string; name: string; navTree: NavNode[] }> {
 	const page = await browser.newPage()
 	try {
 		const baseUrl = `${config.baseUrl}/${owner}/${name}`
 		await page.goto(baseUrl, { waitUntil: 'networkidle2', timeout: 60000 })
-		return await extractNavTree(page)
+		const navTree = await extractNavTree(page)
+		return { owner, name, navTree }
 	} finally {
 		await page.close()
 	}
+}
+
+export interface TaskListResult {
+	tasks: Task[]
+	taskMap: Map<string, Task>
+}
+
+export interface Task {
+	url: string
+	depth: number
+	isLeaf: boolean
+	filePath: string
+}
+
+export function buildTaskList(
+	nodes: NavNode[],
+	repoSlug: string,
+	nameFormat: NameFormat
+): TaskListResult {
+	const tasks: Task[] = []
+	const taskMap = new Map<string, Task>()
+
+	function traverse(node: NavNode, parentSlugs: string[]) {
+		const slug = titleToSlug(node.title, nameFormat)
+		const currentSlugs = [...parentSlugs, slug]
+		const isLeaf = !node.children || node.children.length === 0
+
+		let filePath: string
+		if (isLeaf) {
+			filePath = [...currentSlugs.slice(0, -1), `${slug}.md`].join('/')
+		} else {
+			filePath = [...currentSlugs, 'index.md'].join('/')
+		}
+
+		const task: Task = {
+			url: node.url,
+			depth: parentSlugs.length,
+			isLeaf,
+			filePath,
+		}
+		tasks.push(task)
+		taskMap.set(node.url, task)
+
+		if (node.children) {
+			for (const child of node.children) {
+				traverse(child, currentSlugs)
+			}
+		}
+	}
+
+	for (const node of nodes) {
+		traverse(node, [])
+	}
+
+	return { tasks, taskMap }
 }
 
 export async function scrapePage(

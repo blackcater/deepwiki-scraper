@@ -5,11 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-bun dev openclaw/openclaw   # Scrape a repo (owner/repo format)
-bun test                    # Run tests
-bunx oxlint                 # Lint code
-bunx oxfmt                  # Format code
-npx tsc --noEmit           # Type check
+bun dev <owner/repo> [owner/repo...]  # Scrape one or more repos (owner/repo format)
+bun test                            # Run tests
+bunx oxlint                         # Lint code
+bunx oxfmt                          # Format code
+npx tsc --noEmit                   # Type check
 ```
 
 ## Architecture
@@ -18,21 +18,22 @@ npx tsc --noEmit           # Type check
 
 ### Scrape Flow
 
-1. Parse `owner/repo` argument, load `scraper.yaml` config
+1. Parse multiple `owner/repo` arguments, load `scraper.yaml` config
 2. Launch puppeteer-extra browser with stealth plugin
-3. Navigate to DeepWiki page, extract sidebar navigation tree (CSS selector: `ul.flex-1:nth-child(2) > li`)
-4. Traverse tree, build task list with file paths
-5. Add tasks to bunqueue Queue, Worker processes with concurrency control
-6. On job completion: save markdown content immediately to file
+3. For each repo:
+   - navTreeQueue (concurrency=1) scrapes navigation tree
+   - pageQueue (concurrency=configurable) scrapes individual pages
+4. On job completion: save markdown content immediately to file
+5. Print summary table with cli-table3
 
 ### Key Files
 
-- `src/index.ts` - Entry point, orchestrates flow, manages browser/queue/worker lifecycle
-- `src/scraper.ts` - Pure scraping: `extractNavTree`, `scrapePage`, `titleToSlug`, `savePage`
-- `src/queue.ts` - bunqueue Queue and Worker setup
+- `src/index.ts` - Entry point, orchestrates flow, manages browser/queues/workers lifecycle
+- `src/scraper.ts` - Pure scraping: `extractNavTree`, `scrapeNavTree`, `scrapePage`, `titleToSlug`, `savePage`, `buildTaskList`
+- `src/queue.ts` - bunqueue Queue and Worker setup for navTreeQueue and pageQueue
 - `src/browser.ts` - puppeteer-extra browser management
 - `src/config.ts` - `loadConfig()` from YAML, `parseRepo()` helper
-- `src/types.ts` - TypeScript types: `Config`, `NavNode`, `ScrapePageResult`, `ScrapeRepoResult`
+- `src/types.ts` - TypeScript types: `Config`, `NavNode`, `NavTreeJobData`, `PageJobData`, `RepoResult`
 
 ### File Naming & Paths
 
@@ -54,8 +55,11 @@ outputDir: './output'
 maxConcurrency: 3
 delayMs: 1000
 headless: false
+navTreeConcurrency: 1
 baseUrl: 'https://deepwiki.com'
 nameFormat: kebab-case
+retryAttempts: 3
+retryDelay: 1000
 ```
 
 ### Dependencies

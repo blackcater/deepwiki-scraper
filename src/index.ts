@@ -1,157 +1,213 @@
 import { join } from 'node:path'
 
 import { shutdownManager } from 'bunqueue/client'
+import Table from 'cli-table3'
 
 import { launchBrowser, closeBrowser } from './browser'
 import { loadConfig, parseRepo } from './config'
-import { createQueue, createWorker } from './queue'
-import type { Task } from './queue'
-import { scrapeNavTree, scrapePage, savePage, titleToSlug } from './scraper'
-import type { NavNode, ScrapePageResult, ScrapeRepoResult } from './types'
+import {
+	createNavTreeQueue,
+	createPageQueue,
+	createNavTreeWorker,
+	createPageWorker,
+	type NavTreeResult,
+} from './queue'
+import { scrapeNavTree, scrapePage, savePage, buildTaskList } from './scraper'
+import type { RepoResult, ScrapePageResult } from './types'
 
-interface TaskWithPath {
-	filePath: string
-}
-
-async function scrapeRepo(repo: string): Promise<ScrapeRepoResult> {
+async function scrapeRepos(repos: string[]): Promise<RepoResult[]> {
 	const config = loadConfig()
-	const { owner, name } = parseRepo(repo)
-	const repoSlug = `${owner}_${name}`
-	const outputBase = join(config.outputDir, repoSlug)
-
 	const browser = await launchBrowser(config)
 
-	// Step 1: Extract navigation tree from sidebar
-	const navTree: NavNode[] = await scrapeNavTree(browser, owner, name, config)
+	const navTreeQueue = createNavTreeQueue()
+	const pageQueue = createPageQueue()
 
-	// Step 2: Build task list from nav tree
-	const { tasks, taskMap } = buildTaskList(navTree, config.nameFormat)
+	const repoResults: RepoResult[] = []
+	const allTaskMaps = new Map<string, Map<string, { filePath: string }>>()
+	const allOutputBases = new Map<string, string>()
+	const pendingPages = new Map<string, { success: number; failure: number }>()
 
-	// Step 3: Create queue and worker
-	const queue = createQueue()
-	const pages: ScrapePageResult[] = []
-
-	const worker = createWorker(
-		config.maxConcurrency,
-		config.delayMs,
-		async (data) => {
-			return scrapePage(browser, data.url)
+	// Create nav tree worker (concurrency=1 for sequential nav tree scraping)
+	const navTreeWorker = createNavTreeWorker(
+		config.navTreeConcurrency,
+		async (job) => {
+			return scrapeNavTree(
+				browser,
+				job.data.repoOwner,
+				job.data.repoName,
+				config
+			)
 		}
 	)
 
-	worker.on('completed', async (_job, result) => {
-		const page = result as ScrapePageResult
-		pages.push(page)
-
-		const taskInfo = taskMap.get(page.url)
-		if (taskInfo && page.content) {
-			const filePath = join(outputBase, taskInfo.filePath)
-			await savePage(page.content, filePath)
-			console.log(`Saved: ${filePath}`)
+	// Create page worker (configurable concurrency)
+	const pageWorker = createPageWorker(
+		config.maxConcurrency,
+		config.delayMs,
+		async (job) => {
+			return scrapePage(browser, job.data.url)
 		}
-	})
+	)
 
-	worker.on('failed', (_job, error) => {
-		console.error(`Job failed: ${error.message}`)
-	})
+	// Process nav tree results and add page jobs
+	navTreeWorker.on('completed', async (job, result) => {
+		const { owner, name, navTree } = result as NavTreeResult
+		const repoSlug = `${owner}_${name}`
+		const outputBase = join(config.outputDir, repoSlug)
 
-	// Add all tasks to queue with retry options
-	for (const task of tasks) {
-		await queue.add('scrape', task, {
-			attempts: config.retryAttempts,
-			backoff: config.retryDelay,
-		})
-	}
+		allOutputBases.set(repoSlug, outputBase)
+		pendingPages.set(repoSlug, { success: 0, failure: 0 })
 
-	// Wait for all jobs to complete
-	await new Promise<void>((resolve) => {
-		worker.on('drained', () => {
-			resolve()
-		})
-	})
-
-	await worker.close()
-	shutdownManager()
-	await closeBrowser(browser)
-
-	return { owner, name, pages }
-}
-
-function buildTaskList(
-	nodes: NavNode[],
-	nameFormat: string
-): { tasks: Task[]; taskMap: Map<string, TaskWithPath> } {
-	const tasks: Task[] = []
-	const taskMap = new Map<string, TaskWithPath>()
-
-	function traverse(node: NavNode, parentSlugs: string[]) {
-		const slug = titleToSlug(
-			node.title,
-			nameFormat as
+		// Build task list and add to page queue
+		const { tasks, taskMap } = buildTaskList(
+			navTree,
+			repoSlug,
+			config.nameFormat as
 				| 'kebab-case'
 				| 'snake_case'
 				| 'camelCase'
 				| 'PascalCase'
 		)
-		const currentSlugs = [...parentSlugs, slug]
-		const isLeaf = !node.children || node.children.length === 0
 
-		// Determine file path
-		let filePath: string
-		if (isLeaf) {
-			// Leaf node: my-project/my-doc.md
-			filePath = [...currentSlugs.slice(0, -1), `${slug}.md`].join('/')
-		} else {
-			// Has children: my-project/index.md
-			filePath = [...currentSlugs, 'index.md'].join('/')
+		// Store task map for later use
+		allTaskMaps.set(repoSlug, taskMap as Map<string, { filePath: string }>)
+
+		// Add page jobs to queue (max 3 for testing)
+		for (const task of tasks.slice(0, 3)) {
+			await pageQueue.add(
+				'scrape',
+				{
+					url: task.url,
+					depth: task.depth,
+					isLeaf: task.isLeaf,
+					filePath: task.filePath,
+					repoSlug,
+				},
+				{
+					attempts: config.retryAttempts,
+					backoff: config.retryDelay,
+				}
+			)
+		}
+	})
+
+	// Track page completion
+	pageWorker.on('completed', async (job, result) => {
+		const page = result as ScrapePageResult
+
+		const repoSlug = page.url.split('/').slice(-2).join('_')
+		const taskInfo = allTaskMaps.get(repoSlug)?.get(page.url)
+		const outputBase = allOutputBases.get(repoSlug)
+
+		if (taskInfo && outputBase && page.content) {
+			const filePath = join(outputBase, taskInfo.filePath)
+			await savePage(page.content, filePath)
+			console.log(`Saved: ${filePath}`)
 		}
 
-		const task: Task = {
-			url: node.url,
-			depth: parentSlugs.length,
-			isLeaf,
-			filePath,
+		// Update counts
+		const counts = pendingPages.get(repoSlug)
+		if (counts) {
+			counts.success++
 		}
-		tasks.push(task)
-		taskMap.set(node.url, { filePath })
+	})
 
-		if (node.children) {
-			for (const child of node.children) {
-				traverse(child, currentSlugs)
-			}
-		}
+	pageWorker.on('failed', (_job, error) => {
+		// Extract repoSlug from job data if available
+		console.error(`Job failed: ${error.message}`)
+	})
+
+	// Wait for all queues to be ready
+	await navTreeQueue.waitUntilReady()
+	await navTreeWorker.waitUntilReady()
+	await pageQueue.waitUntilReady()
+	await pageWorker.waitUntilReady()
+
+	// Add nav tree jobs for all repos
+	for (const repo of repos) {
+		const { owner, name } = parseRepo(repo)
+		await navTreeQueue.add('nav-tree', { repoOwner: owner, repoName: name })
 	}
 
-	for (const node of nodes) {
-		traverse(node, [])
+	// Wait for all nav tree jobs to complete
+	await new Promise<void>((resolve) => {
+		navTreeWorker.on('drained', () => {
+			resolve()
+		})
+	})
+
+	// Wait for all page jobs to complete
+	await new Promise<void>((resolve) => {
+		pageWorker.on('drained', () => {
+			resolve()
+		})
+	})
+
+	// Build results
+	for (const repo of repos) {
+		const { owner, name } = parseRepo(repo)
+		const repoSlug = `${owner}_${name}`
+		const counts = pendingPages.get(repoSlug) || { success: 0, failure: 0 }
+		repoResults.push({
+			owner,
+			name,
+			totalPages: counts.success + counts.failure,
+			successCount: counts.success,
+			failureCount: counts.failure,
+		})
 	}
 
-	return { tasks, taskMap }
+	await navTreeWorker.close()
+	await pageWorker.close()
+	shutdownManager()
+	await closeBrowser(browser)
+
+	return repoResults
+}
+
+function printSummary(results: RepoResult[]) {
+	const table = new Table({
+		head: ['Repo', 'Total Pages', 'Success', 'Failed'],
+		colWidths: [30, 15, 15, 15],
+	})
+
+	for (const result of results) {
+		const status = result.error ? '❌' : '✅'
+		table.push([
+			`${status} ${result.owner}/${result.name}`,
+			result.totalPages.toString(),
+			result.successCount.toString(),
+			result.failureCount.toString(),
+		])
+	}
+
+	console.log('\n' + table.toString())
 }
 
 async function main() {
-	const args = Bun.argv.slice(2)
-	const repo = args[0]
+	const repos = Bun.argv.slice(2)
 
-	if (!repo) {
-		console.error('Usage: bun dev <owner/repo>')
+	if (repos.length === 0) {
+		console.error('Usage: bun dev <owner/repo> [owner/repo ...]')
 		process.exit(1)
 	}
 
-	if (!repo.includes('/')) {
-		console.error('Invalid repo format. Expected: owner/repo')
-		process.exit(1)
+	for (const repo of repos) {
+		if (!repo.includes('/')) {
+			console.error(`Invalid repo format: ${repo}. Expected: owner/repo`)
+			process.exit(1)
+		}
 	}
-
-	console.log(`Starting DeepWiki scraper for ${repo}`)
 
 	const config = loadConfig()
 	console.log(`Loaded config from scraper.yaml`)
 	console.log(`Output directory: ${config.outputDir}`)
 	console.log(`Max concurrency: ${config.maxConcurrency}`)
+	console.log(`Nav tree concurrency: ${config.navTreeConcurrency}`)
+	console.log(`Scraping ${repos.length} repo(s): ${repos.join(', ')}\n`)
 
-	const result: ScrapeRepoResult = await scrapeRepo(repo)
-	console.log(`Scraped ${result.pages.length} pages`)
+	const results = await scrapeRepos(repos)
+	printSummary(results)
 	console.log('Scraping complete!')
 }
 

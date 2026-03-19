@@ -14,17 +14,20 @@ Edit `scraper.yaml`:
 
 ```yaml
 # Output directory
-outputDir: "./output"
+outputDir: './output'
 
 # Concurrency and rate limiting
 maxConcurrency: 3
 delayMs: 1000
 
+# Nav tree queue concurrency (1 for sequential nav tree scraping)
+navTreeConcurrency: 1
+
 # Browser mode
 headless: false
 
 # DeepWiki base URL
-baseUrl: "https://deepwiki.com"
+baseUrl: 'https://deepwiki.com'
 
 # File naming format: kebab-case, snake_case, camelCase, PascalCase
 nameFormat: kebab-case
@@ -53,8 +56,8 @@ output/openclaw_openclaw/
 ## Commands
 
 ```bash
-bun dev <owner/repo>  # Scrape a repo
-bun test              # Run tests
-bunx oxlint           # Lint code
-bunx oxfmt            # Format code
+bun dev <owner/repo> [owner/repo...]  # Scrape one or more repos
+bun test                            # Run tests
+bunx oxlint                         # Lint code
+bunx oxfmt                          # Format code
 ```

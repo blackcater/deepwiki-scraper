@@ -13,6 +13,7 @@ export interface Config {
 	nameFormat: NameFormat
 	retryAttempts: number
 	retryDelay: number
+	navTreeConcurrency: number
 }
 
 export interface NavNode {
@@ -39,5 +40,27 @@ export interface ScrapeRepoResult {
 	owner: string
 	name: string
 	pages: ScrapePageResult[]
+	error?: string
+}
+
+export interface NavTreeJobData {
+	repoOwner: string
+	repoName: string
+}
+
+export interface PageJobData {
+	url: string
+	depth: number
+	isLeaf: boolean
+	filePath: string
+	repoSlug: string
+}
+
+export interface RepoResult {
+	owner: string
+	name: string
+	totalPages: number
+	successCount: number
+	failureCount: number
 	error?: string
 }

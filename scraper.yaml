@@ -6,6 +6,8 @@ headless: false
 # Retry settings
 retryAttempts: 3
 retryDelay: 1000
+# Nav tree queue concurrency (1 for sequential nav tree scraping)
+navTreeConcurrency: 1
 
 # DeepWiki base URL
 baseUrl: "https://deepwiki.com"
