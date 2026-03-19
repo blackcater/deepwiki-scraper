@@ -2,7 +2,7 @@
 outputDir: "./output"
 maxConcurrency: 3
 delayMs: 1000
-headless: false
+headless: true
 # Retry settings
 retryAttempts: 3
 retryDelay: 1000

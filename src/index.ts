@@ -49,6 +49,10 @@ async function scrapeRepos(repos: string[]): Promise<RepoResult[]> {
 		}
 	)
 
+	// Track pending page jobs count
+	let pendingPageJobs = 0
+	let pendingPageResolve: (() => void) | null = null
+
 	// Process nav tree results and add page jobs
 	navTreeWorker.on('completed', async (job, result) => {
 		const { owner, name, navTree } = result as NavTreeResult
@@ -73,7 +77,8 @@ async function scrapeRepos(repos: string[]): Promise<RepoResult[]> {
 		allTaskMaps.set(repoSlug, taskMap as Map<string, { filePath: string }>)
 
 		// Add page jobs to queue (max 3 for testing)
-		for (const task of tasks.slice(0, 3)) {
+		pendingPageJobs += tasks.length
+		for (const task of tasks) {
 			await pageQueue.add(
 				'scrape',
 				{
@@ -91,10 +96,9 @@ async function scrapeRepos(repos: string[]): Promise<RepoResult[]> {
 		}
 	})
 
-	// Track page completion
+	// Track page completion - single consolidated handler
 	pageWorker.on('completed', async (job, result) => {
 		const page = result as ScrapePageResult
-
 		const repoSlug = job.data.repoSlug
 		const taskInfo = allTaskMaps.get(repoSlug)?.get(page.url)
 		const outputBase = allOutputBases.get(repoSlug)
@@ -110,11 +114,26 @@ async function scrapeRepos(repos: string[]): Promise<RepoResult[]> {
 		if (counts) {
 			counts.success++
 		}
+
+		// Decrement pending counter and resolve if done
+		pendingPageJobs--
+		if (pendingPageJobs === 0 && pendingPageResolve) {
+			pendingPageResolve()
+		}
 	})
 
-	pageWorker.on('failed', (_job, error) => {
-		// Extract repoSlug from job data if available
+	pageWorker.on('failed', (job, error) => {
 		console.error(`Job failed: ${error.message}`)
+		const repoSlug = job.data.repoSlug
+		const counts = pendingPages.get(repoSlug)
+		if (counts) {
+			counts.failure++
+		}
+
+		pendingPageJobs--
+		if (pendingPageJobs === 0 && pendingPageResolve) {
+			pendingPageResolve()
+		}
 	})
 
 	// Wait for all queues to be ready
@@ -138,9 +157,11 @@ async function scrapeRepos(repos: string[]): Promise<RepoResult[]> {
 
 	// Wait for all page jobs to complete
 	await new Promise<void>((resolve) => {
-		pageWorker.on('drained', () => {
+		pendingPageResolve = resolve
+		// If no jobs were added, resolve immediately
+		if (pendingPageJobs === 0) {
 			resolve()
-		})
+		}
 	})
 
 	// Build results
