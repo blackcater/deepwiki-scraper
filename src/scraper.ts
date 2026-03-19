@@ -78,14 +78,49 @@ export async function scrapeNavTree(
 	}
 }
 
-// TODO: Scrape single page content
 export async function scrapePage(
-	_browser: Browser,
-	_url: string
+	browser: Browser,
+	url: string
 ): Promise<ScrapePageResult> {
-	// 1. Navigate to URL
-	// 2. Wait for content to load
-	// 3. Extract title, body content, any metadata
-	// 4. Return structured result
-	return { url: _url, title: '' }
+	const page = await browser.newPage()
+	try {
+		await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 })
+
+		// Extract title from h1 tag
+		const title = await page.$eval(
+			'h1',
+			(el) => el.textContent?.trim() || ''
+		)
+
+		// Find all scripts and locate the one with markdown content
+		interface ScriptContent {
+			text: string
+		}
+
+		const scripts: ScriptContent[] = await page.$$eval(
+			'script',
+			(elements) => elements.map((el) => ({ text: el.textContent || '' }))
+		)
+
+		let content = ''
+		for (const script of scripts) {
+			const pattern = `self.__next_f.push([1,"# ${title}`
+			if (script.text.startsWith(pattern)) {
+				const match = script.text.match(
+					/self\.__next_f\.push\(\[1,"([\s\S]*?)"\]\)/
+				)
+				if (match && match[1]) {
+					content = match[1]
+						.replace(/\\n/g, '\n')
+						.replace(/\\"/g, '"')
+						.replace(/\\\\/g, '\\')
+				}
+				break
+			}
+		}
+
+		return { url, title, content }
+	} finally {
+		await page.close()
+	}
 }
