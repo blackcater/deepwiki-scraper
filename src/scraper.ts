@@ -16,35 +16,39 @@ export function titleToSlug(title: string, format: NameFormat): string {
 		format === 'kebab-case' ? '-' : format === 'snake_case' ? '_' : null
 
 	if (separator) {
-		// kebab-case or snake_case: lowercase all, preserve parentheses
+		// kebab-case or snake_case: lowercase all, replace hyphens with separator, keep colons and parentheses
 		return words
 			.map((w) => {
-				// Remove non-alphanumeric chars except parentheses
-				const cleaned = w.replace(/[^a-zA-Z0-9()]/g, '')
-				return cleaned.toLowerCase()
+				// Remove non-alphanumeric chars except colons, hyphens, and parentheses
+				const cleaned = w.replace(/[^a-zA-Z0-9:()_-]/g, '')
+				// Replace hyphens with separator
+				return cleaned.replace(/-/g, separator).toLowerCase()
 			})
 			.join(separator)
 	}
 
 	// camelCase or PascalCase
-	return words
+	// Split by spaces AND hyphens to properly handle word boundaries
+	return processed
+		.split(/[\s\-]+/)
 		.map((w, i) => {
-			const firstChar = w.charAt(0)
+			// Remove non-alphanumeric chars except colons and parentheses
+			const cleaned = w.replace(/[^a-zA-Z0-9:()]/g, '')
+			const firstChar = cleaned.charAt(0)
 			const isNonAlphanumericStart = !/[a-zA-Z0-9]/.test(firstChar)
 
 			if (isNonAlphanumericStart) {
-				// e.g., '(Nodes)' - preserve prefix, capitalize first alphanumeric
-				const match = w.match(/[a-zA-Z0-9]/)
-				if (!match) return w.toLowerCase()
+				// e.g., '(Nodes)' or ':LLM' - preserve prefix, capitalize first alphanumeric
+				const match = cleaned.match(/[a-zA-Z0-9]/)
+				if (!match) return cleaned.toLowerCase()
 				const idx = match.index ?? 0
-				const prefix = w.slice(0, idx)
-				const rest = w.slice(idx + 1)
+				const prefix = cleaned.slice(0, idx)
+				const rest = cleaned.slice(idx + 1)
 				const capitalized = match[0].toUpperCase() + rest.toLowerCase()
 				return prefix + capitalized
 			}
 
 			// Normal word
-			const cleaned = w.replace(/[^a-zA-Z0-9]/g, '')
 			const firstAlphanumeric = cleaned.charAt(0)
 			const rest = cleaned.slice(1)
 

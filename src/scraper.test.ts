@@ -13,6 +13,9 @@ test('titleToSlug converts to kebab-case', () => {
 	expect(titleToSlug('Native Clients (Nodes)', 'kebab-case')).toBe(
 		'native-clients-(nodes)'
 	)
+	expect(titleToSlug('pi-ai: LLM API Library', 'kebab-case')).toBe(
+		'pi-ai:-llm-api-library'
+	)
 })
 
 test('titleToSlug converts to snake_case', () => {
@@ -26,6 +29,9 @@ test('titleToSlug converts to snake_case', () => {
 	)
 	expect(titleToSlug('Native Clients (Nodes)', 'snake_case')).toBe(
 		'native_clients_(nodes)'
+	)
+	expect(titleToSlug('pi-ai: LLM API Library', 'snake_case')).toBe(
+		'pi_ai:_llm_api_library'
 	)
 })
 
@@ -41,6 +47,9 @@ test('titleToSlug converts to camelCase', () => {
 	expect(titleToSlug('Native Clients (Nodes)', 'camelCase')).toBe(
 		'nativeClients(Nodes)'
 	)
+	expect(titleToSlug('pi-ai: LLM API Library', 'camelCase')).toBe(
+		'piAi:LlmApiLibrary'
+	)
 })
 
 test('titleToSlug converts to PascalCase', () => {
@@ -54,6 +63,9 @@ test('titleToSlug converts to PascalCase', () => {
 	)
 	expect(titleToSlug('Native Clients (Nodes)', 'PascalCase')).toBe(
 		'NativeClients(Nodes)'
+	)
+	expect(titleToSlug('pi-ai: LLM API Library', 'PascalCase')).toBe(
+		'PiAi:LlmApiLibrary'
 	)
 })
 
