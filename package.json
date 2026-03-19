@@ -1,0 +1,34 @@
+{
+  "name": "deepwiki-scraper",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun src/index.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.1.0",
+    "@logtape/file": "^2.0.4",
+    "@logtape/logtape": "^2.0.4",
+    "bunqueue": "^2.6.39",
+    "chalk": "^5.6.2",
+    "cli-table3": "^0.6.5",
+    "commander": "^14.0.3",
+    "figures": "^6.1.0",
+    "p-limit": "^7.3.0",
+    "pretty-error": "^4.0.0",
+    "puppeteer": "24.39.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "yaml": "^2.8.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "oxfmt": "^0.41.0",
+    "oxlint": "^1.56.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

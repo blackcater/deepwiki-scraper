@@ -1,0 +1,8 @@
+# DeepWiki Scraper Configuration
+outputDir: './output'
+maxConcurrency: 3
+delayMs: 1000
+headless: false
+
+# DeepWiki base URL
+baseUrl: 'https://deepwiki.com'

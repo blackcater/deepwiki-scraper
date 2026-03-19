@@ -1,0 +1,43 @@
+{
+  "cSpell.words": ["orpc"],
+  "editor.rulers": [80, 100],
+  "editor.wordWrapColumn": 80,
+  "files.readonlyInclude": {
+    "**/node_modules/**": true,
+    "**/pnpm-lock.yaml": true
+  },
+  "eslint.enable": false,
+  "prettier.enabled": false,
+  "oxc.enable": true,
+  // JavaScript
+  "[javascript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "file"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "file"
+  },
+  // JSON
+  "[json]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[jsonc]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  // TypeScript
+  "[typescript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "file"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "file"
+  }
+}

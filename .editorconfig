@@ -1,0 +1,25 @@
+root = true
+
+[*]
+charset = utf-8
+tab_width = 2
+indent_size = 2
+indent_style = space
+insert_final_newline = true
+
+[*.{js,jsx,cjs,mjs,ts,tsx,cts,mts}]
+tab_width = 4
+indent_size = 4
+indent_style = tab
+trim_trailing_whitespace = true
+
+[*.rs]
+tab_width = 4
+indent_size = 4
+indent_style = space
+trim_trailing_whitespace = true
+
+[*.json]
+tab_width = 2
+indent_size = 2
+indent_style = space
