@@ -95,7 +95,7 @@ async function scrapeRepos(repos: string[]): Promise<RepoResult[]> {
 	pageWorker.on('completed', async (job, result) => {
 		const page = result as ScrapePageResult
 
-		const repoSlug = page.url.split('/').slice(-2).join('_')
+		const repoSlug = job.data.repoSlug
 		const taskInfo = allTaskMaps.get(repoSlug)?.get(page.url)
 		const outputBase = allOutputBases.get(repoSlug)
 
