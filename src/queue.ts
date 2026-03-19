@@ -41,6 +41,7 @@ export function createNavTreeWorker(
 		{
 			embedded: true,
 			concurrency,
+			useLocks: false,
 		}
 	)
 }
@@ -63,6 +64,7 @@ export function createPageWorker(
 		{
 			embedded: true,
 			concurrency,
+			useLocks: false,
 		}
 	)
 }
