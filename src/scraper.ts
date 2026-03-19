@@ -1,8 +1,54 @@
+import { mkdir, writeFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
+
 import type { Browser, Page } from 'puppeteer'
 
-import type { Config, NavNode, ScrapePageResult } from './types'
+import type { Config, NameFormat, NavNode, ScrapePageResult } from './types'
 
 const PADDING_PER_LEVEL = 12
+
+export function titleToSlug(title: string, format: NameFormat): string {
+	const words = title.split(/\s+/)
+	switch (format) {
+		case 'kebab-case':
+			return words
+				.map((w) => w.toLowerCase().replace(/[^a-z0-9]/g, '-'))
+				.join('-')
+				.replace(/-+/g, '-') // Collapse multiple dashes
+		case 'snake_case':
+			return words
+				.map((w) => w.toLowerCase().replace(/[^a-z0-9]/g, '_'))
+				.join('_')
+		case 'camelCase':
+			return words
+				.map((w, i) => {
+					const cleaned = w.replace(/[^a-zA-Z0-9]/g, '')
+					return i === 0
+						? cleaned.toLowerCase()
+						: cleaned.charAt(0).toUpperCase() +
+								cleaned.slice(1).toLowerCase()
+				})
+				.join('')
+		case 'PascalCase':
+			return words
+				.map((w) => {
+					const cleaned = w.replace(/[^a-zA-Z0-9]/g, '')
+					return (
+						cleaned.charAt(0).toUpperCase() +
+						cleaned.slice(1).toLowerCase()
+					)
+				})
+				.join('')
+	}
+}
+
+export async function savePage(
+	content: string,
+	outputPath: string
+): Promise<void> {
+	await mkdir(dirname(outputPath), { recursive: true })
+	await writeFile(outputPath, content, 'utf-8')
+}
 
 async function extractNavTree(page: Page): Promise<NavNode[]> {
 	const navTree: NavNode[] = []
@@ -114,6 +160,13 @@ export async function scrapePage(
 						.replace(/\\n/g, '\n')
 						.replace(/\\"/g, '"')
 						.replace(/\\\\/g, '\\')
+						.replace(/\\u003c/g, '<')
+						.replace(/\\u003e/g, '>')
+						.replace(/\\u0026/g, '&')
+						.replace(/\\u0027/g, "'")
+						.replace(/\\u0022/g, '"')
+						.replace(/\\u003d/g, '=')
+						.replace(/\\u0060/g, '`')
 				}
 				break
 			}

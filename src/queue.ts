@@ -5,11 +5,15 @@ import type { ScrapeResult } from './types'
 export interface Task {
 	url: string
 	depth: number
+	isLeaf: boolean
+	filePath: string
 }
 
 export interface ScrapeJobData {
 	url: string
 	depth: number
+	isLeaf: boolean
+	filePath: string
 }
 
 export function createQueue() {

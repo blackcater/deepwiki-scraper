@@ -1,9 +1,16 @@
+export type NameFormat =
+	| 'kebab-case'
+	| 'snake_case'
+	| 'camelCase'
+	| 'PascalCase'
+
 export interface Config {
 	outputDir: string
 	maxConcurrency: number
 	delayMs: number
 	baseUrl: string
 	headless: boolean
+	nameFormat: NameFormat
 }
 
 export interface NavNode {
