@@ -12,7 +12,6 @@ async function scrapeRepo(repo: string): Promise<ScrapeRepoResult> {
 	const { owner, name } = parseRepo(repo)
 
 	const browser = await launchBrowser(config)
-	const page = await browser.newPage()
 
 	// Step 1: Extract navigation tree from sidebar
 	const navTree: NavNode[] = await scrapeNavTree(browser, owner, name, config)
@@ -28,7 +27,7 @@ async function scrapeRepo(repo: string): Promise<ScrapeRepoResult> {
 		config.maxConcurrency,
 		config.delayMs,
 		async (data) => {
-			return scrapePage(page, data.url)
+			return scrapePage(browser, data.url)
 		}
 	)
 
@@ -40,8 +39,8 @@ async function scrapeRepo(repo: string): Promise<ScrapeRepoResult> {
 		console.error(`Job failed: ${error.message}`)
 	})
 
-	// Add all tasks to queue
-	for (const task of tasks) {
+	// Add all tasks to queue (debug: limit to 1 task)
+	for (const task of tasks.slice(0, 1)) {
 		await queue.add('scrape', task)
 	}
 

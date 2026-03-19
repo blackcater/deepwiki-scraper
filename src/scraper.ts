@@ -2,37 +2,64 @@ import type { Browser, Page } from 'puppeteer'
 
 import type { Config, NavNode, ScrapePageResult } from './types'
 
-// TODO: Extract sidebar navigation structure from page
-export async function extractNavTree(_page: Page): Promise<NavNode[]> {
-	// 1. Find sidebar container (specific selectors based on DeepWiki structure)
-	// 2. Recursively parse navigation items
-	// 3. Build tree structure with titles and URLs
-	return []
-}
+const PADDING_PER_LEVEL = 12
 
-// TODO: Scrape single page content
-export async function scrapePage(
-	_page: Page,
-	_url: string
-): Promise<ScrapePageResult> {
-	// 1. Navigate to URL
-	// 2. Wait for content to load
-	// 3. Extract title, body content, any metadata
-	// 4. Return structured result
-	return { url: _url, title: '' }
-}
+async function extractNavTree(page: Page): Promise<NavNode[]> {
+	const navTree: NavNode[] = []
 
-// TODO: Extract all links from current page
-export async function extractLinks(page: Page): Promise<string[]> {
-	const links = await page.$$eval('a', (anchors) =>
-		anchors.map((a) => a.href).filter((href) => href.includes('/'))
+	interface NavItem {
+		paddingLeft: number
+		href: string
+		title: string
+	}
+
+	const navItems: NavItem[] = await page.$$eval(
+		'ul.flex-1:nth-child(2) > li',
+		(liElements) =>
+			liElements.map((li) => {
+				const a = li.querySelector('a')
+				const paddingLeft = Number.parseInt(
+					li.style.paddingLeft || '0',
+					10
+				)
+				return {
+					paddingLeft,
+					href: a?.href || '',
+					title: a?.textContent?.trim() || '',
+				}
+			})
 	)
-	return links
-}
 
-// TODO: Wait for page content to be fully loaded
-export async function waitForContent(page: Page): Promise<void> {
-	await page.waitForSelector('body', { timeout: 30000 })
+	if (navItems.length === 0) {
+		return []
+	}
+
+	const stack: NavNode[] = []
+
+	for (const item of navItems) {
+		const depth = item.paddingLeft / PADDING_PER_LEVEL
+		const node: NavNode = {
+			title: item.title,
+			url: item.href,
+		}
+
+		while (stack.length > depth) {
+			stack.pop()
+		}
+
+		if (depth === 0) {
+			navTree.push(node)
+		} else {
+			const parent = stack.at(-1)
+			if (parent) {
+				parent.children = parent.children || []
+				parent.children.push(node)
+			}
+		}
+
+		stack.push(node)
+	}
+	return navTree
 }
 
 export async function scrapeNavTree(
@@ -49,4 +76,16 @@ export async function scrapeNavTree(
 	} finally {
 		await page.close()
 	}
+}
+
+// TODO: Scrape single page content
+export async function scrapePage(
+	_browser: Browser,
+	_url: string
+): Promise<ScrapePageResult> {
+	// 1. Navigate to URL
+	// 2. Wait for content to load
+	// 3. Extract title, body content, any metadata
+	// 4. Return structured result
+	return { url: _url, title: '' }
 }
