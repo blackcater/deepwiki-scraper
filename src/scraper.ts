@@ -8,38 +8,57 @@ import type { Config, NameFormat, NavNode, ScrapePageResult } from './types'
 const PADDING_PER_LEVEL = 12
 
 export function titleToSlug(title: string, format: NameFormat): string {
-	const words = title.split(/\s+/)
-	switch (format) {
-		case 'kebab-case':
-			return words
-				.map((w) => w.toLowerCase().replace(/[^a-z0-9]/g, '-'))
-				.join('-')
-				.replace(/-+/g, '-') // Collapse multiple dashes
-		case 'snake_case':
-			return words
-				.map((w) => w.toLowerCase().replace(/[^a-z0-9]/g, '_'))
-				.join('_')
-		case 'camelCase':
-			return words
-				.map((w, i) => {
-					const cleaned = w.replace(/[^a-zA-Z0-9]/g, '')
-					return i === 0
-						? cleaned.toLowerCase()
-						: cleaned.charAt(0).toUpperCase() +
-								cleaned.slice(1).toLowerCase()
-				})
-				.join('')
-		case 'PascalCase':
-			return words
-				.map((w) => {
-					const cleaned = w.replace(/[^a-zA-Z0-9]/g, '')
-					return (
-						cleaned.charAt(0).toUpperCase() +
-						cleaned.slice(1).toLowerCase()
-					)
-				})
-				.join('')
+	// Preprocess: replace & with ' and ' before splitting
+	const processed = title.replace(/&/g, ' and ')
+	const words = processed.split(/\s+/)
+
+	const separator =
+		format === 'kebab-case' ? '-' : format === 'snake_case' ? '_' : null
+
+	if (separator) {
+		// kebab-case or snake_case: lowercase all, preserve parentheses
+		return words
+			.map((w) => {
+				// Remove non-alphanumeric chars except parentheses
+				const cleaned = w.replace(/[^a-zA-Z0-9()]/g, '')
+				return cleaned.toLowerCase()
+			})
+			.join(separator)
 	}
+
+	// camelCase or PascalCase
+	return words
+		.map((w, i) => {
+			const firstChar = w.charAt(0)
+			const isNonAlphanumericStart = !/[a-zA-Z0-9]/.test(firstChar)
+
+			if (isNonAlphanumericStart) {
+				// e.g., '(Nodes)' - preserve prefix, capitalize first alphanumeric
+				const match = w.match(/[a-zA-Z0-9]/)
+				if (!match) return w.toLowerCase()
+				const idx = match.index ?? 0
+				const prefix = w.slice(0, idx)
+				const rest = w.slice(idx + 1)
+				const capitalized = match[0].toUpperCase() + rest.toLowerCase()
+				return prefix + capitalized
+			}
+
+			// Normal word
+			const cleaned = w.replace(/[^a-zA-Z0-9]/g, '')
+			const firstAlphanumeric = cleaned.charAt(0)
+			const rest = cleaned.slice(1)
+
+			if (i === 0) {
+				// First word: all lowercase for camelCase, capitalize first letter for PascalCase
+				return format === 'PascalCase'
+					? firstAlphanumeric.toUpperCase() + rest.toLowerCase()
+					: firstAlphanumeric.toLowerCase() + rest.toLowerCase()
+			}
+
+			// Non-first words: capitalize first letter, lowercase the rest
+			return firstAlphanumeric.toUpperCase() + rest.toLowerCase()
+		})
+		.join('')
 }
 
 export async function savePage(
@@ -206,7 +225,11 @@ export async function scrapePage(
 
 		let content = ''
 		for (const script of scripts) {
-			const pattern = `self.__next_f.push([1,"# ${title}`
+			const stripTitle = title
+				.replace(/&/g, '\\u0026')
+				.replace(/\(/g, '\\u0028')
+				.replace(/\)/g, '\\u0029')
+			const pattern = `self.__next_f.push([1,"# ${stripTitle}`
 			if (script.text.startsWith(pattern)) {
 				const match = script.text.match(
 					/self\.__next_f\.push\(\[1,"([\s\S]*?)"\]\)/

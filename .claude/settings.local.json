@@ -8,7 +8,8 @@
       "Bash(bunx oxfmt:*)",
       "Bash(npx tsc:*)",
       "Bash(git commit:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(bun test:*)"
     ]
   }
 }

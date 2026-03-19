@@ -76,7 +76,7 @@ async function scrapeRepos(repos: string[]): Promise<RepoResult[]> {
 		// Store task map for later use
 		allTaskMaps.set(repoSlug, taskMap as Map<string, { filePath: string }>)
 
-		// Add page jobs to queue (max 3 for testing)
+		// Add page jobs to queue
 		pendingPageJobs += tasks.length
 		for (const task of tasks) {
 			await pageQueue.add(
