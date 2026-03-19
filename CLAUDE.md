@@ -1,105 +1,41 @@
-Default to using Bun instead of Node.js.
+# CLAUDE.md
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads .env, so don't use dotenv.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## APIs
+## Commands
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
-
-## Testing
-
-Use `bun test` to run tests.
-
-```ts#index.test.ts
-import { test, expect } from "bun:test";
-
-test("hello world", () => {
-  expect(1).toBe(1);
-});
+```bash
+bun dev openclaw/openclaw   # Run scraper for a repo
+bun test                    # Run tests
+bunx oxlint                 # Lint code
+bunx oxfmt                  # Format code
+npx tsc --noEmit           # Type check
 ```
 
-## Frontend
+## Architecture
 
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
+**DeepWiki Scraper** - A CLI tool that scrapes documentation from deepwiki.com using puppeteer-extra and bunqueue.
 
-Server:
+### Flow
+1. Parse `owner/repo` argument and load `scraper.yaml` config
+2. Launch browser via puppeteer-extra with stealth plugin
+3. Navigate to DeepWiki page and extract sidebar navigation tree
+4. Flatten tree into tasks, add to bunqueue Queue
+5. Worker processes tasks with concurrency control
+6. Results aggregated and returned as `ScrapeRepoResult`
 
-```ts#index.ts
-import index from "./index.html"
+### Key Files
+- `src/index.ts` - Entry point, orchestrates scrape flow, manages browser/queue/worker lifecycle
+- `src/scraper.ts` - Pure scraping functions: `extractNavTree`, `scrapePage`, `scrapeNavTree`
+- `src/queue.ts` - bunqueue Queue and Worker setup
+- `src/browser.ts` - puppeteer-extra browser management
+- `src/config.ts` - `loadConfig()` from YAML, `parseRepo()` helper
+- `src/types.ts` - `Config`, `NavNode`, `ScrapePageResult`, `ScrapeRepoResult`
 
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
+### Configuration
+`scraper.yaml` contains: `outputDir`, `maxConcurrency`, `delayMs`, `baseUrl`, `headless`
 
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
-
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
-
-With the following `frontend.tsx`:
-
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
-
-// import .css files directly and it works
-import './index.css';
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+### Dependencies
+- **puppeteer-extra** + **stealth** - Headless browser automation
+- **bunqueue** - Job queue with SQLite persistence (embedded mode)
+- **yaml** - Config file parsing
