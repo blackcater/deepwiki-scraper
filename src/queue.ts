@@ -22,11 +22,17 @@ export interface NavTreeResult {
 }
 
 export function createNavTreeQueue() {
-	return new Queue<NavTreeJobData>('nav-tree-tasks', { embedded: true })
+	return new Queue<NavTreeJobData>('nav-tree-tasks', {
+		embedded: true,
+		defaultJobOptions: { timeout: 0, stallTimeout: 0 },
+	})
 }
 
 export function createPageQueue() {
-	return new Queue<PageJobData>('page-tasks', { embedded: true })
+	return new Queue<PageJobData>('page-tasks', {
+		embedded: true,
+		defaultJobOptions: { timeout: 0, stallTimeout: 0 },
+	})
 }
 
 export function createNavTreeWorker(
