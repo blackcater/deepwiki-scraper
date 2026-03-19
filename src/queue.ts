@@ -41,15 +41,3 @@ export function createWorker(
 		}
 	)
 }
-
-// TODO: Aggregate results from all tasks
-export function aggregateResults(_results: ScrapeResult[]): void {
-	// 1. Group by category/section
-	// 2. Sort by URL/path
-	// 3. Generate summary report
-}
-
-// TODO: Display progress to user
-export function displayProgress(completed: number, total: number): void {
-	console.log(`Progress: ${completed}/${total} pages scraped`)
-}

@@ -11,6 +11,8 @@ export interface Config {
 	baseUrl: string
 	headless: boolean
 	nameFormat: NameFormat
+	retryAttempts: number
+	retryDelay: number
 }
 
 export interface NavNode {

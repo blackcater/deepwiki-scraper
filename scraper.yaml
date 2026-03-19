@@ -1,11 +1,14 @@
 # DeepWiki Scraper Configuration
-outputDir: './output'
+outputDir: "./output"
 maxConcurrency: 3
 delayMs: 1000
 headless: false
+# Retry settings
+retryAttempts: 3
+retryDelay: 1000
 
 # DeepWiki base URL
-baseUrl: 'https://deepwiki.com'
+baseUrl: "https://deepwiki.com"
 
 # File/directory naming format: kebab-case, snake_case, camelCase, PascalCase
 nameFormat: kebab-case

@@ -55,9 +55,12 @@ async function scrapeRepo(repo: string): Promise<ScrapeRepoResult> {
 		console.error(`Job failed: ${error.message}`)
 	})
 
-	// Add all tasks to queue
+	// Add all tasks to queue with retry options
 	for (const task of tasks) {
-		await queue.add('scrape', task)
+		await queue.add('scrape', task, {
+			attempts: config.retryAttempts,
+			backoff: config.retryDelay,
+		})
 	}
 
 	// Wait for all jobs to complete
