@@ -16,6 +16,9 @@ test('titleToSlug converts to kebab-case', () => {
 	expect(titleToSlug('pi-ai: LLM API Library', 'kebab-case')).toBe(
 		'pi-ai:-llm-api-library'
 	)
+	expect(titleToSlug('Core Library (@tanstack/ai)', 'kebab-case')).toBe(
+		'core-library-(@tanstackai)'
+	)
 })
 
 test('titleToSlug converts to snake_case', () => {
@@ -32,6 +35,9 @@ test('titleToSlug converts to snake_case', () => {
 	)
 	expect(titleToSlug('pi-ai: LLM API Library', 'snake_case')).toBe(
 		'pi_ai:_llm_api_library'
+	)
+	expect(titleToSlug('Core Library (@tanstack/ai)', 'snake_case')).toBe(
+		'core_library_(@tanstackai)'
 	)
 })
 
@@ -50,6 +56,9 @@ test('titleToSlug converts to camelCase', () => {
 	expect(titleToSlug('pi-ai: LLM API Library', 'camelCase')).toBe(
 		'piAi:LlmApiLibrary'
 	)
+	expect(titleToSlug('Core Library (@tanstack/ai)', 'camelCase')).toBe(
+		'coreLibrary(@TanstackAi)'
+	)
 })
 
 test('titleToSlug converts to PascalCase', () => {
@@ -66,6 +75,9 @@ test('titleToSlug converts to PascalCase', () => {
 	)
 	expect(titleToSlug('pi-ai: LLM API Library', 'PascalCase')).toBe(
 		'PiAi:LlmApiLibrary'
+	)
+	expect(titleToSlug('Core Library (@tanstack/ai)', 'PascalCase')).toBe(
+		'CoreLibrary(@TanstackAi)'
 	)
 })
 

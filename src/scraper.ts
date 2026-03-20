@@ -16,11 +16,11 @@ export function titleToSlug(title: string, format: NameFormat): string {
 		format === 'kebab-case' ? '-' : format === 'snake_case' ? '_' : null
 
 	if (separator) {
-		// kebab-case or snake_case: lowercase all, replace hyphens with separator, keep colons and parentheses
+		// kebab-case or snake_case: lowercase all, replace hyphens with separator, keep colons, @ and parentheses
 		return words
 			.map((w) => {
-				// Remove non-alphanumeric chars except colons, hyphens, and parentheses
-				const cleaned = w.replace(/[^a-zA-Z0-9:()_-]/g, '')
+				// Remove non-alphanumeric chars except @, colons, hyphens, underscores and parentheses
+				const cleaned = w.replace(/[^a-zA-Z0-9@:()_-]/g, '')
 				// Replace hyphens with separator
 				return cleaned.replace(/-/g, separator).toLowerCase()
 			})
@@ -32,20 +32,30 @@ export function titleToSlug(title: string, format: NameFormat): string {
 	return processed
 		.split(/[\s\-]+/)
 		.map((w, i) => {
-			// Remove non-alphanumeric chars except colons and parentheses
-			const cleaned = w.replace(/[^a-zA-Z0-9:()]/g, '')
+			// Remove non-alphanumeric chars except @, colons, parentheses, and /
+			// Keep / so we can split @tanstack/ai into @tanstack and ai
+			const cleaned = w.replace(/[^a-zA-Z0-9@:()/]/g, '')
 			const firstChar = cleaned.charAt(0)
 			const isNonAlphanumericStart = !/[a-zA-Z0-9]/.test(firstChar)
 
 			if (isNonAlphanumericStart) {
-				// e.g., '(Nodes)' or ':LLM' - preserve prefix, capitalize first alphanumeric
+				// e.g., '(Nodes)' or ':LLM' or '@tanstack/ai' - preserve prefix, split on / if present
+				// First, find where the alphanumeric part starts
 				const match = cleaned.match(/[a-zA-Z0-9]/)
 				if (!match) return cleaned.toLowerCase()
 				const idx = match.index ?? 0
 				const prefix = cleaned.slice(0, idx)
-				const rest = cleaned.slice(idx + 1)
-				const capitalized = match[0].toUpperCase() + rest.toLowerCase()
-				return prefix + capitalized
+
+				// Split rest by / to handle @tanstack/ai -> @tanstack and ai
+				const rest = cleaned.slice(idx)
+				const parts = rest.split('/')
+				const titleCased = parts
+					.map(
+						(p) =>
+							p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()
+					)
+					.join('')
+				return prefix + titleCased
 			}
 
 			// Normal word
@@ -229,10 +239,7 @@ export async function scrapePage(
 
 		let content = ''
 		for (const script of scripts) {
-			const stripTitle = title
-				.replace(/&/g, '\\u0026')
-				.replace(/\(/g, '\\u0028')
-				.replace(/\)/g, '\\u0029')
+			const stripTitle = title.replace(/&/g, '\\u0026')
 			const pattern = `self.__next_f.push([1,"# ${stripTitle}`
 			if (script.text.startsWith(pattern)) {
 				const match = script.text.match(
