@@ -30,7 +30,7 @@ export function titleToSlug(title: string, format: NameFormat): string {
 	// camelCase or PascalCase
 	// Split by spaces AND hyphens to properly handle word boundaries
 	return processed
-		.split(/[\s\-]+/)
+		.split(/[\s-]+/)
 		.map((w, i) => {
 			// Remove non-alphanumeric chars except @, colons, parentheses, and /
 			// Keep / so we can split @tanstack/ai into @tanstack and ai
@@ -219,7 +219,7 @@ export async function scrapePage(
 ): Promise<ScrapePageResult> {
 	const page = await browser.newPage()
 	try {
-		await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 })
+		await page.goto(url, { waitUntil: 'load', timeout: 60000 })
 
 		// Extract title from h1 tag
 		const title = await page.$eval(
@@ -234,7 +234,8 @@ export async function scrapePage(
 
 		const scripts: ScriptContent[] = await page.$$eval(
 			'script',
-			(elements) => elements.map((el) => ({ text: el.textContent || '' }))
+			(elements) =>
+				elements.map((el) => ({ text: (el.textContent || '').trim() }))
 		)
 
 		let content = ''

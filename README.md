@@ -5,7 +5,11 @@ A CLI tool that scrapes documentation from [DeepWiki](https://deepwiki.com) and 
 ## Usage
 
 ```bash
-bun dev openclaw/openclaw
+# scape repo
+bun dev scrape openclaw/openclaw
+
+# scape single page
+bun dev scrape tanstack/ai --page https://deepwiki.com/TanStack/ai/3.6-additional-capabilities
 ```
 
 ## Configuration

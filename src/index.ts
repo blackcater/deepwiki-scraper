@@ -2,6 +2,8 @@ import { join } from 'node:path'
 
 import { shutdownManager } from 'bunqueue/client'
 import Table from 'cli-table3'
+import { Command } from 'commander'
+import type { Browser } from 'puppeteer'
 
 import { launchBrowser, closeBrowser } from './browser'
 import { loadConfig, parseRepo } from './config'
@@ -14,6 +16,33 @@ import {
 } from './queue'
 import { scrapeNavTree, scrapePage, savePage, buildTaskList } from './scraper'
 import type { RepoResult, ScrapePageResult } from './types'
+
+interface PageOptions {
+	page?: string
+}
+
+async function scrapeSinglePage(
+	browser: Browser,
+	url: string,
+	outputDir: string
+): Promise<void> {
+	const result = await scrapePage(browser, url)
+
+	if (!result.content) {
+		throw new Error(`Failed to scrape page: ${url}`)
+	}
+
+	// Extract page name from URL path
+	// URL format: https://deepwiki.com/owner/repo/page-name
+	const urlObj = new URL(url)
+	const pathParts = urlObj.pathname.split('/').filter(Boolean)
+	// Remove owner/repo prefix, get the last part as page name
+	const pageName = pathParts.slice(2).join('/') || 'index'
+	const outputPath = join(outputDir, 'pages', `${pageName}.md`)
+
+	await savePage(result.content, outputPath)
+	console.log(`Saved: ${outputPath}`)
+}
 
 async function scrapeRepos(repos: string[]): Promise<RepoResult[]> {
 	const config = loadConfig()
@@ -206,30 +235,126 @@ function printSummary(results: RepoResult[]) {
 }
 
 async function main() {
-	const repos = Bun.argv.slice(2)
+	const program = new Command()
 
-	if (repos.length === 0) {
-		console.error('Usage: bun dev <owner/repo> [owner/repo ...]')
-		process.exit(1)
-	}
+	program
+		.name('deepwiki-scraper')
+		.description('Scrape documentation from deepwiki.com')
+		.version('1.0.0')
 
-	for (const repo of repos) {
-		if (!repo.includes('/')) {
-			console.error(`Invalid repo format: ${repo}. Expected: owner/repo`)
-			process.exit(1)
+	program
+		.command('scrape')
+		.description('Scrape repos or single pages from deepwiki.com')
+		.arguments('<repos...>')
+		.option(
+			'-p, --page <url>',
+			'Scrape a single page from the specified URL'
+		)
+		.action(async (repos: string[], options: PageOptions) => {
+			if (repos.length === 0) {
+				console.error('Error: at least one repo is required')
+				program.error('', { exitCode: 1 })
+			}
+
+			for (const repo of repos) {
+				if (!repo.includes('/')) {
+					console.error(
+						`Invalid repo format: ${repo}. Expected: owner/repo`
+					)
+					program.error('', { exitCode: 1 })
+				}
+			}
+
+			const config = loadConfig()
+
+			if (options.page) {
+				// Single page mode
+				console.log(`Loaded config from scraper.yaml`)
+				console.log(`Output directory: ${config.outputDir}`)
+				console.log(`Scraping single page: ${options.page}\n`)
+
+				const browser = await launchBrowser(config)
+				try {
+					await scrapeSinglePage(
+						browser,
+						options.page,
+						config.outputDir
+					)
+					console.log('\nScraping complete!')
+				} finally {
+					shutdownManager()
+					await closeBrowser(browser)
+				}
+			} else {
+				// Full repo mode
+				console.log(`Loaded config from scraper.yaml`)
+				console.log(`Output directory: ${config.outputDir}`)
+				console.log(`Max concurrency: ${config.maxConcurrency}`)
+				console.log(
+					`Nav tree concurrency: ${config.navTreeConcurrency}`
+				)
+				console.log(
+					`Scraping ${repos.length} repo(s): ${repos.join(', ')}\n`
+				)
+
+				const results = await scrapeRepos(repos)
+				printSummary(results)
+				console.log('Scraping complete!')
+			}
+		})
+
+	// Handle default command (backward compatibility for `bun dev owner/repo`)
+	// Only activate when no recognized command is given
+	const hasCommand = Bun.argv
+		.slice(2)
+		.some(
+			(arg) =>
+				arg === 'scrape' ||
+				arg === 'help' ||
+				arg === '--help' ||
+				arg === '-h'
+		)
+	if (!hasCommand) {
+		const repos = Bun.argv.slice(2).filter((arg) => !arg.startsWith('-'))
+		const pageIndex = Bun.argv.indexOf('--page')
+		const page = pageIndex !== -1 ? Bun.argv[pageIndex + 1] : undefined
+
+		if (repos.length > 0) {
+			if (page) {
+				const config = loadConfig()
+				console.log(`Loaded config from scraper.yaml`)
+				console.log(`Output directory: ${config.outputDir}`)
+				console.log(`Scraping single page: ${page}\n`)
+
+				const browser = await launchBrowser(config)
+				try {
+					await scrapeSinglePage(browser, page, config.outputDir)
+					console.log('\nScraping complete!')
+				} finally {
+					shutdownManager()
+					await closeBrowser(browser)
+				}
+			} else {
+				const config = loadConfig()
+				console.log(`Loaded config from scraper.yaml`)
+				console.log(`Output directory: ${config.outputDir}`)
+				console.log(`Max concurrency: ${config.maxConcurrency}`)
+				console.log(
+					`Nav tree concurrency: ${config.navTreeConcurrency}`
+				)
+				console.log(
+					`Scraping ${repos.length} repo(s): ${repos.join(', ')}\n`
+				)
+
+				const results = await scrapeRepos(repos)
+				printSummary(results)
+				console.log('Scraping complete!')
+			}
+			return
 		}
 	}
 
-	const config = loadConfig()
-	console.log(`Loaded config from scraper.yaml`)
-	console.log(`Output directory: ${config.outputDir}`)
-	console.log(`Max concurrency: ${config.maxConcurrency}`)
-	console.log(`Nav tree concurrency: ${config.navTreeConcurrency}`)
-	console.log(`Scraping ${repos.length} repo(s): ${repos.join(', ')}\n`)
-
-	const results = await scrapeRepos(repos)
-	printSummary(results)
-	console.log('Scraping complete!')
+	program.parse()
 }
 
 main().catch((err) => {

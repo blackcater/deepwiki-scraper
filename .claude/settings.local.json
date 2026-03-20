@@ -9,7 +9,8 @@
       "Bash(npx tsc:*)",
       "Bash(git commit:*)",
       "Bash(git add:*)",
-      "Bash(bun test:*)"
+      "Bash(bun test:*)",
+      "Bash(bun:*)"
     ]
   }
 }
